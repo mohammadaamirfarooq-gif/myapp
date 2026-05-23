@@ -65,6 +65,7 @@ export default function App() {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
+        "Content-Profile": "record"
       },
       body: JSON.stringify(data),
     });
@@ -83,6 +84,7 @@ export default function App() {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
+        "Content-Profile": "record"
       },
       body: JSON.stringify(data),
     });
