@@ -67,7 +67,7 @@ export default function App() {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
-        "Accept-Profile": "record",
+        "Content-Profile": "record",
       },
       body: JSON.stringify(data),
     });
