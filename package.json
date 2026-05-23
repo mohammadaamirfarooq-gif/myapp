@@ -1,5 +1,5 @@
 {
-  "homepage":"https://mohammadaamirfarooq-gif.github.io/myapp",
+  "homepage": "https://mohammadaamirfarooq-gif.github.io/myapp",
   "name": "reactcurd",
   "private": true,
   "version": "0.0.0",
@@ -9,8 +9,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy":"npm run build",
-    "deploy":"gh-pages -d dist"
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "react": "^19.2.6",
