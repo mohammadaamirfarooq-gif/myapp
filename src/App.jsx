@@ -1,21 +1,57 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ToastContainer, toast } from "react-toastify";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import {
+  FaEdit,
+  FaEnvelope,
+  FaPlus,
+  FaSearch,
+  FaSortAlphaDown,
+  FaTimes,
+  FaTrash,
+  FaUsers,
+} from "react-icons/fa";
 import "react-toastify/dist/ReactToastify.css";
 
 const API_URL = "https://vgthwiqpvzdptqhvzqmx.supabase.co/rest/v1/users";
 const API_KEY = "sb_publishable_oFuQ3NpyweCtNJIbcwLvyg_jMIHzIuQ";
 
+const statusOptions = {
+  2: {
+    label: "Active",
+    dot: "bg-emerald-500",
+    className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  },
+  1: {
+    label: "Pending",
+    dot: "bg-amber-500",
+    className: "bg-amber-50 text-amber-700 ring-amber-200",
+  },
+  0: {
+    label: "Inactive",
+    dot: "bg-rose-500",
+    className: "bg-rose-50 text-rose-700 ring-rose-200",
+  },
+};
+
+const inputClass = (hasError) =>
+  `h-10 w-full rounded-md border bg-white px-3 text-sm outline-none transition focus:ring-2 ${
+    hasError
+      ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
+      : "border-slate-300 focus:border-slate-500 focus:ring-slate-100"
+  }`;
+
+const FieldError = ({ message }) =>
+  message ? (
+    <p className="text-xs font-medium text-rose-600">{message}</p>
+  ) : null;
+
 export default function App() {
   const [users, setUsers] = useState([]);
   const [editId, setEditId] = useState(null);
-
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
-
   const [loading, setLoading] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 6;
 
@@ -23,11 +59,15 @@ export default function App() {
     register,
     handleSubmit,
     reset,
-  } = useForm();
+    formState: { errors },
+  } = useForm({
+    mode: "onSubmit",
+    defaultValues: {
+      status: 2,
+      gender: "male",
+    },
+  });
 
-  // =========================
-  // FETCH USERS
-  // =========================
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -54,9 +94,6 @@ export default function App() {
     fetchUsers();
   }, []);
 
-  // =========================
-  // CREATE
-  // =========================
   const createUser = async (data) => {
     const res = await fetch(API_URL, {
       method: "POST",
@@ -65,7 +102,7 @@ export default function App() {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
-        "Content-Profile": "record"
+        "Content-Profile": "record",
       },
       body: JSON.stringify(data),
     });
@@ -73,9 +110,6 @@ export default function App() {
     return res.json();
   };
 
-  // =========================
-  // UPDATE
-  // =========================
   const updateUser = async (id, data) => {
     const res = await fetch(`${API_URL}?id=eq.${id}`, {
       method: "PATCH",
@@ -84,7 +118,7 @@ export default function App() {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
-        "Content-Profile": "record"
+        "Content-Profile": "record",
       },
       body: JSON.stringify(data),
     });
@@ -92,16 +126,15 @@ export default function App() {
     return res.json();
   };
 
-  // =========================
-  // SUBMIT
-  // =========================
   const onSubmit = async (data) => {
     try {
       setLoading(true);
 
       const payload = {
         ...data,
+        age: data.age === "" ? null : Number(data.age),
         status: Number(data.status),
+        dob: data.dob || null,
       };
 
       if (editId) {
@@ -113,7 +146,7 @@ export default function App() {
 
         toast.success("User updated");
         setEditId(null);
-        reset();
+        reset({ status: 2, gender: "male" });
         return;
       }
 
@@ -121,7 +154,7 @@ export default function App() {
       setUsers((prev) => [...prev, result[0]]);
 
       toast.success("User added");
-      reset();
+      reset({ status: 2, gender: "male" });
     } catch {
       toast.error("Error occurred");
     } finally {
@@ -129,9 +162,10 @@ export default function App() {
     }
   };
 
-  // =========================
-  // DELETE
-  // =========================
+  const onInvalid = () => {
+    toast.error("Please fill all required fields");
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm("Delete user?")) return;
 
@@ -143,13 +177,10 @@ export default function App() {
       },
     });
 
-    setUsers(users.filter((u) => u.id !== id));
+    setUsers((prev) => prev.filter((u) => u.id !== id));
     toast.success("Deleted");
   };
 
-  // =========================
-  // EDIT
-  // =========================
   const handleEdit = (user) => {
     setEditId(user.id);
 
@@ -165,18 +196,17 @@ export default function App() {
     });
   };
 
-  // =========================
-  // FILTER
-  // =========================
+  const handleCancelEdit = () => {
+    setEditId(null);
+    reset({ status: 2, gender: "male" });
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter((u) =>
       u.name?.toLowerCase().includes(search.toLowerCase())
     );
   }, [users, search]);
 
-  // =========================
-  // SORT
-  // =========================
   const sortedUsers = useMemo(() => {
     return [...filteredUsers].sort((a, b) =>
       sortOrder === "asc"
@@ -185,9 +215,6 @@ export default function App() {
     );
   }, [filteredUsers, sortOrder]);
 
-  // =========================
-  // PAGINATION
-  // =========================
   const totalPages = Math.ceil(sortedUsers.length / usersPerPage);
 
   const currentUsers = sortedUsers.slice(
@@ -195,226 +222,427 @@ export default function App() {
     currentPage * usersPerPage
   );
 
+  const activeCount = users.filter((u) => Number(u.status) === 2).length;
+  const pendingCount = users.filter((u) => Number(u.status) === 1).length;
+  const inactiveCount = users.filter((u) => Number(u.status) === 0).length;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+    <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
+      <ToastContainer position="top-right" autoClose={2200} />
 
-      <ToastContainer />
-
-      {/* HEADER */}
-      <div className="bg-white shadow-sm border-b p-5 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex justify-between">
-          <h1 className="text-2xl font-bold">Power Admin System</h1>
-          <span>Total Users: {users.length}</span>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto p-6">
-
-        {/* STATS */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-xl shadow">Users: {users.length}</div>
-          <div className="bg-white p-4 rounded-xl shadow">Filtered: {sortedUsers.length}</div>
-          <div className="bg-white p-4 rounded-xl shadow">Page: {currentPage}</div>
-          <div className="bg-blue-600 text-white p-4 rounded-xl">Active System</div>
-        </div>
-
-        {/* FORM */}
-        <div className="bg-white p-6 rounded-2xl shadow mb-6">
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="grid md:grid-cols-4 gap-4"
-          >
-
-            <input placeholder="Name" className="p-3 border rounded"
-              {...register("name")} />
-
-            <input placeholder="Age" type="number" className="p-3 border rounded"
-              {...register("age")} />
-
-            <input placeholder="Email" className="p-3 border rounded"
-              {...register("email")} />
-
-            <select className="p-3 border rounded"
-              {...register("status")}>
-              <option value={2}>Active</option>
-              <option value={1}>Pending</option>
-              <option value={0}>Inactive</option>
-            </select>
-
-            <select className="p-3 border rounded"
-              {...register("gender")}>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
-
-            <input type="date" className="p-3 border rounded"
-              {...register("dob")} />
-
-            <input placeholder="Nationality" className="p-3 border rounded"
-              {...register("nationality")} />
-
-            <input placeholder="CNIC" className="p-3 border rounded"
-              {...register("cnic")} />
-
-            <button className="bg-blue-600 text-white p-3 rounded col-span-4">
-              {editId ? "Update User" : "Add User"}
-            </button>
-
-          </form>
-        </div>
-
-        {/* SEARCH */}
-        <div className="flex gap-4 mb-6">
-          <input
-            className="p-3 border rounded w-full"
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-
-          <select className="p-3 border rounded"
-            onChange={(e) => setSortOrder(e.target.value)}>
-            <option value="asc">A-Z</option>
-            <option value="desc">Z-A</option>
-          </select>
-        </div>
-
-        {/* USERS */}
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <div className="grid md:grid-cols-3 gap-5">
-
-            {currentUsers.map((u) => (
-              <div key={u.id} className="group bg-white border rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 relative overflow-hidden">
-              {/* TOP COLOR STRIP */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-
-              {/* HEADER */}
-              <div className="flex items-start justify-between">
-
-                {/* AVATAR + NAME */}
-                <div className="flex items-center gap-3">
-
-                  {/* AVATAR */}
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold bg-gradient-to-br from-blue-100 to-purple-100 text-gray-700 shadow-inner">
-                    {u.gender === "male" && "👨"}
-                    {u.gender === "female" && "👩"}
-                    {u.gender !== "male" && u.gender !== "female" && "🧑"}
-                  </div>
-
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition">
-                      {u.name}
-                    </h2>
-
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      📧 {u.email}
-                    </p>
-                  </div>
-                </div>
-
-                {/* AGE BADGE */}
-                <span className="text-xs bg-gray-100 px-3 py-1 rounded-full">
-                  🎂 {u.age}
-                </span>
-              </div>
-
-              {/* INFO GRID */}
-              <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-gray-600">
-
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <p className="text-xs text-gray-400">Gender</p>
-                  <p>
-                    {u.gender === "male" && "👨 Male"}
-                    {u.gender === "female" && "👩 Female"}
-                    {u.gender !== "male" && u.gender !== "female" && "🧑 Other"}
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <p className="text-xs text-gray-400">DOB</p>
-                  <p>🎂 {u.dob || "—"}</p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <p className="text-xs text-gray-400">Nationality</p>
-                  <p>🌍 {u.nationality || "—"}</p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <p className="text-xs text-gray-400">CNIC</p>
-                  <p>🆔 {u.cnic || "—"}</p>
-                </div>
-
-              </div>
-
-              {/* STATUS */}
-              <div className="mt-4 flex justify-between items-center">
-
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-medium shadow-sm ${
-                    Number(u.status) === 2
-                      ? "bg-green-100 text-green-700"
-                      : Number(u.status) === 1
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-600"
-                  }`}
-                >
-                  {Number(u.status) === 2
-                    ? "🟢 Active"
-                    : Number(u.status) === 1
-                    ? "🟡 Pending"
-                    : "🔴 Inactive"}
-                </span>
-
-                {/* QUICK LABEL */}
-                <span className="text-xs text-gray-400">
-                  ID: {u.id?.slice?.(0, 6)}
-                </span>
-              </div>
-
-              {/* ACTIONS */}
-              <div className="flex gap-2 mt-4 opacity-90 group-hover:opacity-100 transition">
-
-                <button
-                  onClick={() => handleEdit(u)}
-                  className="flex-1 bg-gradient-to-r from-amber-400 to-orange-400 hover:from-orange-400 hover:to-amber-500 text-white py-2 rounded-xl font-medium transition"
-                >
-                  ✏️ Edit
-                </button>
-
-                <button
-                  onClick={() => handleDelete(u.id)}
-                  className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 hover:from-pink-500 hover:to-red-500 text-white py-2 rounded-xl font-medium transition"
-                >
-                  🗑 Delete
-                </button>
-
-              </div>
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-slate-950 text-white">
+              <FaUsers />
             </div>
-            ))}
-
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">
+                Power Admin System
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Manage user records, statuses, and identity details.
+              </p>
+            </div>
           </div>
-        )}
 
-        {/* PAGINATION */}
-        <div className="flex justify-center gap-4 mt-8">
-          <button disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}>
-            Prev
-          </button>
-
-          <span>{currentPage} / {totalPages || 1}</span>
-
-          <button disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}>
-            Next
-          </button>
+          <div className="grid grid-cols-2 overflow-hidden rounded-md border border-slate-200 bg-white sm:grid-cols-4">
+            <div className="border-r border-slate-200 px-4 py-3">
+              <p className="text-xs font-medium uppercase text-slate-500">
+                Total
+              </p>
+              <p className="mt-1 text-xl font-bold">{users.length}</p>
+            </div>
+            <div className="border-r border-slate-200 px-4 py-3">
+              <p className="text-xs font-medium uppercase text-slate-500">
+                Active
+              </p>
+              <p className="mt-1 text-xl font-bold text-emerald-700">
+                {activeCount}
+              </p>
+            </div>
+            <div className="border-r border-slate-200 px-4 py-3">
+              <p className="text-xs font-medium uppercase text-slate-500">
+                Pending
+              </p>
+              <p className="mt-1 text-xl font-bold text-amber-700">
+                {pendingCount}
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-xs font-medium uppercase text-slate-500">
+                Inactive
+              </p>
+              <p className="mt-1 text-xl font-bold text-rose-700">
+                {inactiveCount}
+              </p>
+            </div>
+          </div>
         </div>
+      </header>
 
-      </div>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <section className="mb-6 rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                {editId ? "Edit User Record" : "Create User Record"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Enter verified user information for the directory.
+              </p>
+            </div>
+            <span className="hidden rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-600 sm:inline-flex">
+              {editId ? "Editing" : "New Entry"}
+            </span>
+          </div>
+
+          <form
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4"
+          >
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Name
+              </span>
+              <input
+                placeholder="Full name"
+                className={inputClass(errors.name)}
+                {...register("name", {
+                  required: "Name is required",
+                  minLength: {
+                    value: 2,
+                    message: "Name must be at least 2 characters",
+                  },
+                })}
+              />
+              <FieldError message={errors.name?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Age
+              </span>
+              <input
+                placeholder="Age"
+                type="number"
+                className={inputClass(errors.age)}
+                {...register("age", {
+                  required: "Age is required",
+                  min: {
+                    value: 1,
+                    message: "Age must be greater than 0",
+                  },
+                })}
+              />
+              <FieldError message={errors.age?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Email
+              </span>
+              <input
+                placeholder="name@example.com"
+                className={inputClass(errors.email)}
+                {...register("email", {
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: "Enter a valid email address",
+                  },
+                })}
+              />
+              <FieldError message={errors.email?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Status
+              </span>
+              <select
+                className={inputClass(errors.status)}
+                {...register("status", {
+                  required: "Status is required",
+                })}
+              >
+                <option value={2}>Active</option>
+                <option value={1}>Pending</option>
+                <option value={0}>Inactive</option>
+              </select>
+              <FieldError message={errors.status?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Gender
+              </span>
+              <select
+                className={inputClass(errors.gender)}
+                {...register("gender", {
+                  required: "Gender is required",
+                })}
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+              <FieldError message={errors.gender?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                DOB
+              </span>
+              <input
+                type="date"
+                className={inputClass(errors.dob)}
+                {...register("dob", {
+                  required: "Date of birth is required",
+                })}
+              />
+              <FieldError message={errors.dob?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                Nationality
+              </span>
+              <input
+                placeholder="Nationality"
+                className={inputClass(errors.nationality)}
+                {...register("nationality", {
+                  required: "Nationality is required",
+                })}
+              />
+              <FieldError message={errors.nationality?.message} />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                CNIC
+              </span>
+              <input
+                placeholder="CNIC"
+                className={inputClass(errors.cnic)}
+                {...register("cnic", {
+                  required: "CNIC is required",
+                })}
+              />
+              <FieldError message={errors.cnic?.message} />
+            </label>
+
+            <div className="flex gap-3 md:col-span-2 xl:col-span-4">
+              <button
+                disabled={loading}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                <FaPlus className="text-xs" />
+                {editId ? "Update User" : "Add User"}
+              </button>
+
+              {editId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <FaTimes className="text-xs" />
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </section>
+
+        <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                User Directory
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {sortedUsers.length} result
+                {sortedUsers.length === 1 ? "" : "s"} shown from {users.length}{" "}
+                total records.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative">
+                <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+                <input
+                  className="h-10 min-w-0 rounded-md border border-slate-300 pl-9 pr-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100 sm:w-72"
+                  placeholder="Search by name"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+
+              <label className="relative">
+                <FaSortAlphaDown className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+                <select
+                  className="h-10 rounded-md border border-slate-300 bg-white pl-9 pr-8 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                  value={sortOrder}
+                  onChange={(e) => {
+                    setSortOrder(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="asc">Name A-Z</option>
+                  <option value="desc">Name Z-A</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="px-5 py-12 text-center text-sm font-medium text-slate-500">
+              Loading users...
+            </div>
+          ) : currentUsers.length === 0 ? (
+            <div className="px-5 py-12 text-center text-sm font-medium text-slate-500">
+              No users found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1040px] border-collapse text-left">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-bold">User</th>
+                    <th className="px-5 py-3 font-bold">Age</th>
+                    <th className="px-5 py-3 font-bold">Gender</th>
+                    <th className="px-5 py-3 font-bold">DOB</th>
+                    <th className="px-5 py-3 font-bold">Nationality</th>
+                    <th className="px-5 py-3 font-bold">CNIC</th>
+                    <th className="px-5 py-3 font-bold">Status</th>
+                    <th className="px-5 py-3 text-right font-bold">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {currentUsers.map((u) => {
+                    const status =
+                      statusOptions[Number(u.status)] || statusOptions[0];
+
+                    const initials =
+                      u.name
+                        ?.split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase() || "U";
+
+                    return (
+                      <tr key={u.id} className="transition hover:bg-slate-50">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-sm font-bold text-slate-700 ring-1 ring-slate-200">
+                              {initials}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-950">
+                                {u.name || "Unnamed User"}
+                              </p>
+                              <p className="flex items-center gap-1 truncate text-sm text-slate-500">
+                                <FaEnvelope className="text-xs text-slate-400" />
+                                {u.email || "No email"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {u.age || "-"}
+                        </td>
+
+                        <td className="px-5 py-3 text-sm capitalize text-slate-700">
+                          {u.gender || "-"}
+                        </td>
+
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {u.dob || "-"}
+                        </td>
+
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {u.nationality || "-"}
+                        </td>
+
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {u.cnic || "-"}
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <span
+                            className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ${status.className}`}
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full ${status.dot}`}
+                            />
+                            {status.label}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleEdit(u)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+                              title="Edit user"
+                              aria-label="Edit user"
+                            >
+                              <FaEdit />
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(u.id)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                              title="Delete user"
+                              aria-label="Delete user"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">
+              Page {currentPage} of {totalPages || 1}
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+
+              <button
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
